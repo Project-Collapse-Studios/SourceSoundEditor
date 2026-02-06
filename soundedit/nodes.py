@@ -14,9 +14,8 @@ from PySide6.QtGui import (
 )
 
 from . import manifest
-from .utils import str_bool
 from .types import NodeKeyValueType
-
+from srctools import conv_bool
 
 class OperatorNode(BaseNode):
     """
@@ -56,13 +55,13 @@ class OperatorNode(BaseNode):
                 self.add_checkbox(
                     name=kv['name'],
                     label=kv['name'],
-                    state=str_bool(kv['default']) if 'default' in kv else False
+                    state=conv_bool(kv['default']) if 'default' in kv else False
                 )
             case 'bool':
                 self.add_checkbox(
                     name=kv['name'],
                     label=kv['name'],
-                    state=str_bool(kv['default']) if 'default' in kv else False
+                    state=conv_bool(kv['default']) if 'default' in kv else False
                 )
             case 'enum':
                 self.add_combo_menu(
@@ -88,7 +87,7 @@ class OperatorNode(BaseNode):
             return False
 
         if isinstance(w, NodeCheckBox):
-            w.set_value(str_bool(value))
+            w.set_value(conv_bool(value))
         else:
             w.set_value(value)
         return True

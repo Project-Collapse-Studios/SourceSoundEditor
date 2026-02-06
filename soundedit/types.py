@@ -1,9 +1,11 @@
 
 from typing import TypedDict, Literal, Dict
+import enum
+class StackType(enum.IntEnum):
+    Start = 0,
+    Update = 1,
+    Stop = 2
 
-class StackType:
-    Start = 0
-    Update = 1
 
 
 class NodeKeyValueType(TypedDict):

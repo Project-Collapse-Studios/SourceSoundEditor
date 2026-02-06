@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QSettings
 import sys
-from .soundedit import SoundEdit
+from soundedit import SoundEdit
 
 def main():
 	app = QApplication(sys.argv)
@@ -20,3 +20,7 @@ def main():
 	window.show()
 	
 	app.exec_()
+
+
+if __name__ == "__main__":
+	main()

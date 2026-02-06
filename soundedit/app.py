@@ -2,11 +2,9 @@
 
 import os
 import signal
-import vdf
 import sys
 
 from typing import Tuple
-from vdf import VDFDict
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtWidgets import (
     QApplication, QWidget, QMainWindow,
@@ -19,9 +17,9 @@ from NodeGraphQt import (
     NodesPaletteWidget
 )
 
-from .graph import SoundOperatorGraph
-from .types import StackType
-from . import manifest
+from soundedit.data import NodeData
+from soundedit.graph import SoundOperatorGraph
+from soundedit.types import StackType
 
 
 class SoundEdit(QMainWindow):
@@ -31,7 +29,7 @@ class SoundEdit(QMainWindow):
     """
     def __init__(self):
         super().__init__()
-        self.data: VDFDict = {}
+        self.data: NodeData = NodeData()
         self.graphs = {}
         self.file = None
         self.dirty = None
@@ -42,8 +40,8 @@ class SoundEdit(QMainWindow):
         Load a sound operator stack
         """
         try:
-            with open(file, 'r') as fp:
-                return (self._load_operator_stack(vdf.load(fp, mapper=VDFDict)), '')
+            self.data.LoadSndOperatorStacks(file)
+            return (True, "")
         except Exception as e:
             return (False, str(e))
 
@@ -64,7 +62,7 @@ class SoundEdit(QMainWindow):
         self.dirty = dirty
         self._update_window_title()
 
-    def open_tab(self, type: StackType, name: str) -> bool:
+    def open_tab(self, type_: StackType, name: str) -> bool:
         """
         Load the specified stack in a new tab
         
@@ -79,8 +77,17 @@ class SoundEdit(QMainWindow):
             self.graphs[name].widget.raise_()
             return True
         graph = SoundOperatorGraph(self)
-        stacks = self.data['start_stacks' if type == StackType.Start else 'update_stacks']
-        graph.from_dict(stacks[name], stacks)
+        match type_:
+            case StackType.Start:
+                stacks = self.data.GetStartStacks()
+
+            case StackType.Update:
+                stacks = self.data.GetUpdateStacks()
+
+            case StackType.Stop:
+                stacks = self.data.GetStopStacks()
+                
+        graph.load_stack(stacks.find_block(name), stacks)
 
         w = QWidget(self)
         w.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
@@ -96,7 +103,7 @@ class SoundEdit(QMainWindow):
         return True
 
     
-    def _load_operator_stack(self, data: VDFDict) -> bool:
+    def _load_operator_stack(self, data: NodeData) -> bool:
         self.data = data
         self._populate_list()
         return True
@@ -104,18 +111,20 @@ class SoundEdit(QMainWindow):
 
     def _populate_list(self):
         """Populate the left bar list of operator stacks"""
-        if 'start_stacks' in self.data:
-            for stackName in self.data['start_stacks'].keys():
-                stack = self.data['start_stacks'][stackName]
-                item = QTreeWidgetItem(self.stackListStartStacks)
-                item.setText(0, stackName)
-                item.setData(0, Qt.ItemDataRole.UserRole, (StackType.Start, stackName))
-        if 'update_stacks' in self.data:
-            for stackName in self.data['update_stacks'].keys():
-                stack = self.data['update_stacks'][stackName]
-                item = QTreeWidgetItem(self.stackListUpdateStacks)
-                item.setText(0, stackName)
-                item.setData(0, Qt.ItemDataRole.UserRole, (StackType.Update, stackName))
+        # Start stacks
+        start_stacks = self.data.GetStartStacks()
+        for stackKV in start_stacks:
+            stackName = stackKV.real_name
+            item = QTreeWidgetItem(self.stackListStartStacks)
+            item.setText(0, stackName)
+            item.setData(0, Qt.ItemDataRole.UserRole, (StackType.Start, stackName))
+
+        update_stacks = self.data.GetUpdateStacks()
+        for stackKV in update_stacks:
+            stackName = stackKV.real_name
+            item = QTreeWidgetItem(self.stackListUpdateStacks)
+            item.setText(0, stackName)
+            item.setData(0, Qt.ItemDataRole.UserRole, (StackType.Update, stackName))
 
     def _setup_ui(self):
         """Setup the UI"""
@@ -263,6 +272,7 @@ class SoundEdit(QMainWindow):
         self._add_recent_file(file)
         self._update_window_title()
         self._update_recents_menu()
+        self._populate_list()
         return True
 
     def _on_open(self, checked: bool):

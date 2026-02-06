@@ -10,12 +10,11 @@ from PySide6.QtCore import QObject
 from PySide6.QtGui import QCursor
 from PySide6 import QtCore
 
-from vdf import VDFDict
-
-from . import manifest, nodes, types
-from . nodes import (
+from soundedit import manifest, nodes, types
+from soundedit.nodes import (
     OperatorNode, FloatConstNode
 )
+from srctools import Keyvalues
 
 from typing import (
     Tuple, TypedDict, Dict, Any
@@ -77,40 +76,47 @@ class SoundOperatorGraph(QObject):
         """Returns the status of the dirty flag"""
         return self._dirty
 
-    def from_dict(self, opstack: VDFDict, all_opstacks: VDFDict):
+    def load_stack(self, opstack: Keyvalues, all_opstacks: Keyvalues):
         """
         Load an operator stack from a dict
         
         Parameters
         ----------
-        opstack : dict
+        opstack : Keyvalues
             The operator stack to load.
         """
         # Pass 0: find all import_stacks
         # TODO: Handling for this should be improved. import_stack's are a bit funny, they basically merge keyvalues sections
         #  for now we're just merging with no regard for the output. Not sure how else you'd represent this in the graph anyway
-        for imp in opstack.get_all_for('import_stack'):
-            data: VDFDict = all_opstacks[imp]
-            for key in data.keys():
-                if key in opstack:
-                    opstack[key] = (0,data)
+            
+        for imp in opstack.find_all("import_stack"):
+            imported_stack = all_opstacks.find_block(imp.value)
+            for op in imported_stack:
+                print(f"Merging {op.real_name}!")
+                op_name = op.real_name
+                if op_name in opstack:
+                    our_operator = opstack.find_block(op_name)
+                    for kv in op:
+                        key = kv.real_name
+                        if not key in our_operator:
+                            our_operator[key] = kv.value
                 else:
-                    opstack[key] = data
+                    opstack.append(op)
+            
 
         # Pass 1: create all nodes
-        for node in opstack.keys():
-            value = opstack[node]
-            if isinstance(value, dict):
-                self._create_node(node, opstack)
-            elif isinstance(value, str):
+        for node in opstack:
+            if node.has_children():
+                self._create_node(node)
+            else:
                 print('WARNING: unhandled import_stack operator')
-                print(f'{node} = {opstack[node]}')
+                print(f'{node}')
 
         # Pass 2: resolve connections
-        for node in opstack.keys():
-            value = opstack[node]
-            if isinstance(value, dict):
-                self._resolve(node, opstack)
+        #for node in opstack.keys():
+        #    value = opstack[node]
+        #    if isinstance(value, dict):
+        #        self._resolve(node, opstack)
 
         self.graph.auto_layout_nodes()
 
@@ -148,7 +154,7 @@ class SoundOperatorGraph(QObject):
         for kv in manifest.current().keyvalue_desc(node.type):
             node.set_widget_value(kv['name'], kv['default'])
 
-    def _create_node(self, nodeName: str, opstack: VDFDict):
+    def _create_node(self, node: Keyvalues):
         """
         Creates a new named node from existing operator stack data
         
@@ -156,12 +162,15 @@ class SoundOperatorGraph(QObject):
         ----------
         nodeName : str
             Name of the node
-        opstack : VDFDict
-            Dictionary of operator stack data
+        opstack : Keyvalues
+            Keyvalues of operator stack data
         """
-        node = opstack[nodeName]
+        if node.name == "import_stack": # Skip imported stacks
+            return
+
+        print(node)
         operator = node['operator']
-        n = self.make_node(operator, operator)
+        n = self.make_node(operator, node.real_name)
 
         # Create any constant nodes
         constNodeNum = 0
@@ -183,7 +192,7 @@ class SoundOperatorGraph(QObject):
                 continue
             n.set_widget_value(kv['name'], node[kv['name']])
 
-    def _resolve(self, nodeName: str, opstack: VDFDict):
+    def _resolve(self, nodeName: str, opstack):
         """
         Resolves inter-node references
         
