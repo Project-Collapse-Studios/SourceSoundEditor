@@ -1,6 +1,7 @@
 
 from typing import TypedDict, Literal, Dict
 import enum
+from srctools import conv_bool, conv_float, conv_int
 class StackType(enum.IntEnum):
     Start = 0,
     Update = 1,
@@ -59,3 +60,41 @@ class NodeManifest(TypedDict):
     game: str
     nodes: Dict[str, NodeType]
     
+
+
+# DATA TYPES
+# That can be in a value of a sound operator
+class NBool:
+    """Represents a boolean"""
+    def __init__(self, val, def_ = False):
+        self.value = conv_bool(val, default=def_)
+
+class NInt:
+    """Represents an integer"""
+    def __init__(self, val, def_ = 0):
+        self.value = conv_int(val, default=def_)
+
+class NFloat:
+    """Represents a float"""
+    def __init__(self, val, def_ = 0):
+        self.value = conv_float(val, default=def_)
+
+class NStr:
+    """Represents a string"""
+    def __init__(self, val):
+        self.value = val
+
+class NEnumVal:
+    """Represents an enum value"""
+    def __init__(self, val):
+        self.value = val
+
+class NVec3:
+    """Represents a 3D Vector"""
+    def __init__(self, key, struct):
+        pass
+
+class NSpeakers:
+    """Represents speakers"""
+    def __init__(self, val):
+        pass

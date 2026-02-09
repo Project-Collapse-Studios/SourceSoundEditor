@@ -10,7 +10,8 @@ from PySide6.QtCore import QObject
 from PySide6.QtGui import QCursor
 from PySide6 import QtCore
 
-from soundedit import manifest, nodes, types
+from soundedit import nodes, types
+from soundedit.manifest import MANIFEST
 from soundedit.nodes import (
     OperatorNode, FloatConstNode
 )
@@ -32,10 +33,10 @@ class SoundOperatorGraph(QObject):
         self.nodes: Dict[str, OperatorNode] = {}
         self.graph = NodeGraph(self)
         # Register all node types
-        for type in manifest.node_types().keys():
-            self.graph.register_node(
-                OperatorNode(type).__class__
-            )
+        #for type in MANIFEST.node_types().keys():
+        #    self.graph.register_node(
+        #        OperatorNode(type).__class__
+        #    )
 
         self.graph.register_node(
             FloatConstNode
@@ -43,7 +44,7 @@ class SoundOperatorGraph(QObject):
 
         self._dirty = False
 
-        # Configure our context menus. These are static for some reason
+        # Configure our context menus. These are static for some reason 
         self._build_graph_context_menu()
         self._build_node_context_menu()
 
@@ -91,17 +92,19 @@ class SoundOperatorGraph(QObject):
             
         for imp in opstack.find_all("import_stack"):
             imported_stack = all_opstacks.find_block(imp.value)
-            for op in imported_stack:
-                print(f"Merging {op.real_name}!")
-                op_name = op.real_name
-                if op_name in opstack:
-                    our_operator = opstack.find_block(op_name)
-                    for kv in op:
-                        key = kv.real_name
-                        if not key in our_operator:
-                            our_operator[key] = kv.value
-                else:
-                    opstack.append(op)
+            for node in imported_stack:
+                self._create_node(node, True)
+            #for op in imported_stack:
+            #    print(f"Merging {op.real_name}!")
+            #    op_name = op.real_name
+            #    if op_name in opstack:
+            #        our_operator = opstack.find_block(op_name)
+            #        for kv in op:
+            #            key = kv.real_name
+            #            if not key in our_operator:
+            #                our_operator[key] = kv.value
+            #    else:
+            #        opstack.append(op)
             
 
         # Pass 1: create all nodes
@@ -118,9 +121,13 @@ class SoundOperatorGraph(QObject):
         #    if isinstance(value, dict):
         #        self._resolve(node, opstack)
 
+        # Pass 3: Register imported nodes, after we are done with initial configuration
+        for node in self.nodes.values():
+            node.registerImportedType()
+
         self.graph.auto_layout_nodes()
 
-    def make_node(self, node_type: str, name: str | None = None) -> OperatorNode:
+    def make_node(self, node_type: str, name: str, data: Keyvalues, is_import = False) -> OperatorNode:
         """
         Makes a new node, setting defaults as required
         
@@ -131,7 +138,9 @@ class SoundOperatorGraph(QObject):
         name : str | None
             Name of the node when added to the graph (i.e. my_node)
             If not provided, a unique name will be generated based on the operator type
-            
+        is_import : bool
+            If set to yes, marks the whole node as imported
+        
         Returns
         -------
         OperatorNode :
@@ -140,21 +149,21 @@ class SoundOperatorGraph(QObject):
         if name is None:
             name = self.graph.get_unique_name(node_type)
 
-        n: OperatorNode = self.graph.create_node(
-            f'io.soundedit.operators.Operator_{node_type}',
-            name=name
-        )
-        n.set_type(node_type)
-        self.nodes[name] = n
-        self.set_defaults(n)
+        n = OperatorNode(node_type, name, data, is_import)
+        #n: OperatorNode = self.graph.create_node(
+        #    f'io.soundedit.operators.Operator_{node_type}',
+        #    name=name
+        #)
+        self._add_node(n)
         return n
 
-    def set_defaults(self, node: OperatorNode) -> None:
-        """Set default keyvalues on the node"""
-        for kv in manifest.current().keyvalue_desc(node.type):
-            node.set_widget_value(kv['name'], kv['default'])
+    # Default values handled per node
+    #def set_defaults(self, node: OperatorNode) -> None:
+    #    """Set default keyvalues on the node"""
+    #    for kv in manifest.current().keyvalue_desc(node.type):
+    #        node.set_widget_value(kv['name'], kv['default'])
 
-    def _create_node(self, node: Keyvalues):
+    def _create_node(self, node: Keyvalues, imported = False):
         """
         Creates a new named node from existing operator stack data
         
@@ -165,16 +174,24 @@ class SoundOperatorGraph(QObject):
         opstack : Keyvalues
             Keyvalues of operator stack data
         """
-        if node.name == "import_stack": # Skip imported stacks
+        if node.name == "import_stack":
+            if not imported:
+                raise RuntimeError("Root import stack not handled correctly!")
+            else:
+                return # Skip importing stacks from imported stacks, for now
+        
+        
+        try: #TODO: Implement kv merging
+            operator = node['operator']
+        except:
             return
 
-        print(node)
-        operator = node['operator']
-        n = self.make_node(operator, node.real_name)
+        n = self.make_node(operator, node.real_name, node, imported)
+
 
         # Create any constant nodes
         constNodeNum = 0
-        for input in manifest.current().input_desc(operator):
+        for input in MANIFEST.input_desc(operator):
             inpName = input['name']
             if not inpName in node:
                 continue
@@ -187,10 +204,10 @@ class SoundOperatorGraph(QObject):
             n.set_input_const(inpName, value)
             
         # Set keyvalues
-        for kv in manifest.current().keyvalue_desc(operator):
-            if kv['name'] not in node:
-                continue
-            n.set_widget_value(kv['name'], node[kv['name']])
+        #for kv in manifest.current().keyvalue_desc(operator):
+        #    if kv['name'] not in node:
+        #        continue
+        #    n.set_widget_value(kv['name'], node[kv['name']])
 
     def _resolve(self, nodeName: str, opstack):
         """
@@ -206,8 +223,8 @@ class SoundOperatorGraph(QObject):
         operator = opstack[nodeName]['operator']
         node = opstack[nodeName]
         
-        for input in manifest.current().input_desc(operator):
-            inputName = input['name']
+        for input_ in MANIFEST.input_desc(operator):
+            inputName = input_['name']
             if not inputName in node or not node[inputName].startswith('@'):
                 continue
             
@@ -247,10 +264,11 @@ class SoundOperatorGraph(QObject):
         self.graph.delete_node(n)
         return True
 
-    def _add_node(self, type: str) -> None:
-        node = self.make_node(type, type)
+    def _add_node(self, node: BaseNode) -> None:
+        """Registers a node onto the graph"""
+        self.nodes[node.name()] = node
         self.graph.add_node(
-            node, QCursor.pos()
+            node, (QCursor.pos().x(), QCursor.pos().y()), push_undo=False
         )
 
     def _build_graph_context_menu(self):
@@ -259,8 +277,8 @@ class SoundOperatorGraph(QObject):
 
         # Add node menu
         m = menu.add_menu('Add Node')
-        subs = {x: m.add_menu(x) for x in manifest.current().categories()}
-        for k, v in manifest.node_types().items():
+        subs = {x: m.add_menu(x) for x in MANIFEST.categories()}
+        for k, v in MANIFEST.node_types().items():
             if k == '__base': continue # Skip the "base" node
             x = subs[v['category']] if 'category' in v else m
             x.add_command(
