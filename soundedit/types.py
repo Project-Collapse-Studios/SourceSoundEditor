@@ -91,8 +91,28 @@ class NEnumVal:
 
 class NVec3:
     """Represents a 3D Vector"""
-    def __init__(self, key, struct):
-        pass
+
+    x: NFloat
+    y: NFloat
+    z: NFloat
+
+    def __init__(self, x: NFloat, y: NFloat, z:NFloat):
+        self.x = x
+        self.y = y
+        self.z = z
+    
+    def get_xyz(self):
+        return (self.x,self.y,self.z)
+
+    def get_x(self):
+        return self.x
+
+    def get_y(self):
+        return self.y
+    
+    def get_z(self):
+        return self.z
+
 
 class NSpeakers:
     """Represents speakers"""
