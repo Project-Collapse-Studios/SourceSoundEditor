@@ -21,6 +21,8 @@ from typing import (
     Tuple, TypedDict, Dict, Any
 )
 
+from utils import ConversionExists
+
 
 class SoundOperatorGraph(QObject):
     """
@@ -89,22 +91,22 @@ class SoundOperatorGraph(QObject):
         # Pass 0: find all import_stacks
         # TODO: Handling for this should be improved. import_stack's are a bit funny, they basically merge keyvalues sections
         #  for now we're just merging with no regard for the output. Not sure how else you'd represent this in the graph anyway
-            
+        merged_stack = opstack.copy()
         for imp in opstack.find_all("import_stack"):
             imported_stack = all_opstacks.find_block(imp.value)
             for node in imported_stack:
                 self._create_node(node, True)
-            #for op in imported_stack:
-            #    print(f"Merging {op.real_name}!")
-            #    op_name = op.real_name
-            #    if op_name in opstack:
-            #        our_operator = opstack.find_block(op_name)
-            #        for kv in op:
-            #            key = kv.real_name
-            #            if not key in our_operator:
-            #                our_operator[key] = kv.value
-            #    else:
-            #        opstack.append(op)
+
+            for op in imported_stack:
+                op_name = op.real_name
+                if op_name in merged_stack:
+                    our_operator = merged_stack.find_block(op_name)
+                    for kv in op:
+                        key = kv.real_name
+                        if not key in our_operator:
+                            our_operator[key] = kv.value
+                else:
+                    merged_stack.append(op)
             
 
         # Pass 1: create all nodes
@@ -115,11 +117,8 @@ class SoundOperatorGraph(QObject):
                 print('WARNING: unhandled import_stack operator')
                 print(f'{node}')
 
-        # Pass 2: resolve connections
-        #for node in opstack.keys():
-        #    value = opstack[node]
-        #    if isinstance(value, dict):
-        #        self._resolve(node, opstack)
+        # Pass 2: create links between nodes
+        self._init_resolve_connections(merged_stack)
 
         # Pass 3: Register imported nodes, after we are done with initial configuration
         for node in self.nodes.values():
@@ -201,7 +200,7 @@ class SoundOperatorGraph(QObject):
             if value.startswith('@'):
                 continue
             
-            n.set_input_const(inpName, value)
+            #n.set_input_const(inpName, value)
             
         # Set keyvalues
         #for kv in manifest.current().keyvalue_desc(operator):
@@ -209,7 +208,7 @@ class SoundOperatorGraph(QObject):
         #        continue
         #    n.set_widget_value(kv['name'], node[kv['name']])
 
-    def _resolve(self, nodeName: str, opstack):
+    def _init_resolve_connections(self, opstack: Keyvalues):
         """
         Resolves inter-node references
         
@@ -217,27 +216,38 @@ class SoundOperatorGraph(QObject):
         ----------
         nodeName : str
             Name of the node
-        opstack : VDFDict
-            Dictionary of operator stack data
+        opstack : Keyvalues
+            Keyvalues of operator stack data
         """
-        operator = opstack[nodeName]['operator']
-        node = opstack[nodeName]
-        
-        for input_ in MANIFEST.input_desc(operator):
-            inputName = input_['name']
-            if not inputName in node or not node[inputName].startswith('@'):
+        for node in opstack:
+            if not node.has_children(): # Most likely import stack statement
                 continue
-            
-            value: str = node[inputName]
-            otherName, outName = self._split_input_str(value)
-            
-            other: OperatorNode = self.nodes[otherName]
-            p: Port = other.get_output_port(outName)
-            i: Port = self.nodes[nodeName].get_input_port(inputName)
-            p.connect_to(
-                i,
-                push_undo=False
-            )
+
+            for kv in node:
+                if kv.name.startswith("input") and kv.value.startswith("@"):
+                    val = kv.value[1:] # Remove @
+                    try:
+                        o_nodename, val = val.split(".")
+                    except ValueError:
+                        print(f"Invalid unpacking of I/O declaration: {kv.value}")
+                        continue
+                    
+                    try:
+                        node_out = self.nodes[o_nodename]
+                        node_in = self.nodes[node.name]
+                    except ValueError:
+                        continue # Nothing to do if output node doesn't exist
+                    try:
+                        out_port = node_out.get_output_port(val)
+                        in_port = node_in.get_input_port(kv.name)
+                    except KeyError:
+                        print("Warning, out/in port could not be found!")
+                        continue
+
+                    if out_port and in_port:
+                        print(f"Connecting ports {in_port} <-> {out_port}")
+
+                        out_port.connect_to(in_port, push_undo=False)
 
     def _split_input_str(self, value: str) -> Tuple[str, str]: # (nodeName, outputName)
         value = value.removeprefix('@')

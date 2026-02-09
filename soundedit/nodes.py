@@ -17,6 +17,7 @@ from soundedit.manifest import MANIFEST
 from .types import NodeKeyValueType
 from srctools import conv_bool, Keyvalues
 from soundedit.nodewidgets import *
+from soundedit.utils import ConvertDataType, ConversionExists
 
 class OperatorNode(BaseNode):
     """
@@ -35,7 +36,6 @@ class OperatorNode(BaseNode):
         self.out_ports = {}
         self.type = type_
         self.initialized = False # Set to true if we're finished with setting ourselves up
-
         self.imported = imported # Set to true if we're a node that belongs to another op stack and we've been imported onto this one
         self.imported_data: dict = {} # Stores the data to compare with, if we can un-unregister ourselves
 
@@ -49,26 +49,55 @@ class OperatorNode(BaseNode):
         for kv in raw_data:
             if kv.name == "operator":
                 continue
-            
-            if kv.name.startswith("input") and kv.value.startswith("@"): # TODO: handle input linking
+
+            if kv.name.startswith("input") and kv.value.startswith("@"): # IO linking done after every node initializes
                 continue
-            
             
             datatype = MANIFEST.get_datatype_key(self.type, kv.name)
 
-            #TODO:FIX
-            #print(f"Val: {kv.value}, converted to: {val}")
-            #self.set_property(kv.name, val, push_undo=False)
-            #if self.imported:
-            #    self.imported_data[kv.name] = (val, val_type)
+            value = ConvertDataType(kv.value, datatype)
+
+            self.set_property(kv.name, value, push_undo=False)
+            if self.imported:
+                self.imported_data[kv.name] = value
+                    
 
         self.initialized = True
 
+    def _create_kv_widget(self, type_:str, name:str, *args):
+        """Create a widget of type with name. Enum widgets not supported"""
+        widget = None
+        match type_:
+            case "string":
+                widget = NLineStrWidgetWrapper(self.view, name, *args)
 
+            case "implcit_bool":
+                widget = NBoolWidgetWrapper(self.view, name, *args)
+
+            case "bool":
+                widget = NBoolWidgetWrapper(self.view, name, *args)
+
+            case "float":
+                widget = NFloatWidgetWrapper(self.view, name, *args)
+
+            case "int":
+                widget = NIntWidgetWrapper(self.view, name, *args)
+
+            case "vec3":
+                widget = NVec3WidgetWrapper(self.view, name, *args)
+
+            case "speakers":
+                pass
+
+            case "enum":
+                widget = NEnumWidgetWrapper(self.view, name, *args)
+                
+        
+        return widget
 
     def _create_kv_widgets(self):
         """
-        Create input widget for specified type
+        Creates all input widget for specified node type
         
         Parameters
         ----------
@@ -78,71 +107,17 @@ class OperatorNode(BaseNode):
         kvs = MANIFEST.keyvalue_desc(self.type)
         for kv in kvs:
             widget = None
-            match kv['type']:
-                case "string":
-                    widget = NLineStrWidgetWrapper(self.view, kv['name'])
-
-                case "implcit_bool":
-                    widget = NBoolWidgetWrapper(self.view, kv['name'])
-
-                case "bool":
-                    widget = NBoolWidgetWrapper(self.view, kv['name'])
-
-                case "float":
-                    widget = NFloatWidgetWrapper(self.view, kv['name'])
-
-                case "int":
-                    widget = NIntWidgetWrapper(self.view, kv['name'])
-
-                case "vec3":
-                    widget = NVec3WidgetWrapper(self.view, kv['name'])
-
-                case "speakers":
-                    pass
-
+            match kv['type']:                
                 case "enum":
-                    self.add_combo_menu(
-                        name=kv['name'],
-                        label=kv['name'],
-                        items=kv['choices']
-                    )
-                    self.set_property(kv['name'], str(self._internalgetdefault(kv['name']).value), push_undo=False)
+                    widget = self._create_kv_widget("enum", kv['name'], kv['choices'])
+                    widget.set_value(self._internalgetdefault(kv['name']))
 
                 case _:
-                    pass
-                    #raise RuntimeError(f"Unknown data type {kv['type']}")
+                    widget = self._create_kv_widget(kv['type'], kv['name'])
 
             if widget:
                 self.add_custom_widget(widget)
                     
-
-        #for kv in kvs:
-        #    match kv['type']:
-        #        case 'string':
-        #            self.add_text_input(
-        #                name=kv['name'],
-        #                label=kv['name'],
-        #                text=self._internalgetdefault(kv['name'])
-        #            )
-        #        case 'implicit_bool':
-        #            self.add_checkbox(
-        #                name=kv['name'],
-        #                label=kv['name'],
-        #                state=self._internalgetdefault(kv['name'])
-        #            )
-        #        case 'bool':
-        #            self.add_checkbox(
-        #                name=kv['name'],
-        #                label=kv['name'],
-        #                state=self._internalgetdefault(kv['name'])
-        #            )
-        #        case 'enum':
-        #            self.add_combo_menu(
-        #                name=kv['name'],
-        #                label=kv['name'],
-        #                items=kv['choices']
-        #            )
-        #            self.set_property(kv['name'], self._internalgetdefault(kv['name']), push_undo=False)
 
                 
     def set_widget_value(self, widget_name: str, value: str) -> bool:
@@ -186,64 +161,67 @@ class OperatorNode(BaseNode):
         """
         for o in MANIFEST.output_desc(self.type):
             name = o['name']
-            self.out_ports[name] = self.add_output(
+            port = self.add_output(
                 name=name,
                 color=MANIFEST.color_for_type(o['type'])
             )
+            self.out_ports[name] = port
+            
 
         for i in MANIFEST.input_desc(self.type):
             name = i['name']
-            self.in_ports[name] = self.add_input(
+            port = self.add_input(
                 name=name,
                 color=MANIFEST.color_for_type(i['type'])
             )
-            self.add_text_input(
-                name=name,
-                label=name,
-                tab=name,
-                text=str(self._internalgetdefault(name).value) #TODO: Handle better
-            )
+            self.in_ports[name] = port
+            input_widget = self._create_kv_widget(i['type'], i['name'])
+            if input_widget:
+                self.add_custom_widget(input_widget)
+
+
+        
             
 
     def set_property(self, name, value, push_undo = True):
         self.ImportTypeCheck()
         super().set_property(name, value, push_undo)
 
-
     def on_input_connected(self, in_port: Port, out_port: Port):
         """
         Called when an input is connected
         """
-        w: QLineEdit = self.get_widget(in_port.name()).get_custom_widget()
-        self.inputs_save[in_port.name()] = w.text()
-        w.setText("<CONNECTION>")
+        #if not MANIFEST.get_port_type(in_port.name()).casefold() == MANIFEST.get_port_type(out_port.name()).casefold():
+        #    self.
+
+        in_type = MANIFEST.get_port_type(self.type, 'input', in_port.name()).casefold()
+        out_type = MANIFEST.get_port_type(out_port.node().type, 'output', out_port.name()).casefold()
+
+        if not ConversionExists(out_type, in_type): # If we can't convert from them to us
+            in_port.disconnect_from(out_port, push_undo=False, emit_signal=False)
+            return
+
+        w: QWidget = self.get_widget(in_port.name())
+        
+        if not w:
+            return
+        
+        w = w.get_custom_widget()
+        #self.inputs_save[in_port.name()] = w.get_value() # NType
+        w.setHidden(True) # TODO: Figure out a better way to indicate this universally for all NWidgets?
         w.setDisabled(True)
+
         self.ImportTypeCheck()
         return super().on_input_connected(in_port, out_port)
 
 
     def on_input_disconnected(self, in_port, out_port):
-        w: QLineEdit = self.get_widget(in_port.name()).get_custom_widget()
-        w.setText(self.inputs_save[in_port.name()])
+        w: QWidget = self.get_widget(in_port.name()).get_custom_widget()
+        #w.setText(self.inputs_save[in_port.name()])
+        w.setHidden(False)
         w.setDisabled(False)
         self.ImportTypeCheck()
         return super().on_input_disconnected(in_port, out_port)
-
-
-    def set_input_const(self, input: str, value: str):
-        """
-        Set an input constant for the specified input
-        This will set the line edit's value
-        
-        Parameters
-        ----------
-        input : str
-            Input name
-        value : str
-            Value text
-        """
-        w: QLineEdit = self.get_widget(input).get_custom_widget()
-        w.setText(value)
 
 
 
@@ -290,6 +268,8 @@ class OperatorNode(BaseNode):
         if not self.imported_data: # We have never been an imported node
             return False
         
+        return False #Temporarily disable this code
+        
         widgets: dict = self.widgets()
         for wid_name in widgets.keys():
             print(f"Checking  property {wid_name}")
@@ -312,8 +292,8 @@ class OperatorNode(BaseNode):
                     return False
             except:
                 if not self.imported_data[wid_name] == self.get_property(wid_name):
-                    print(f"IData: {self.imported_data[wid_name]}")
-                    print(f"PData: {self.get_property(wid_name)}")
+                    #print(f"IData: {self.imported_data[wid_name]}")
+                    #print(f"PData: {self.get_property(wid_name)}")
                     return False
 
         return True
@@ -330,6 +310,8 @@ class OperatorNode(BaseNode):
         if not self.imported:
             return
         
+        return
+
         self.set_property("color", (120, 120, 255, 255), False)
         if not self.name().startswith("IMPORTED"):
             self.set_property("name", "IMPORTED: " + self.name(), False)

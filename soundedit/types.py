@@ -92,11 +92,7 @@ class NEnumVal:
 class NVec3:
     """Represents a 3D Vector"""
 
-    x: NFloat
-    y: NFloat
-    z: NFloat
-
-    def __init__(self, x: NFloat, y: NFloat, z:NFloat):
+    def __init__(self, x, y, z):
         self.x = x
         self.y = y
         self.z = z
@@ -110,19 +106,19 @@ class NVec3:
         except ValueError:
             x, y, z = 0, 0, 0 #TODO: Implement undefined behaviour
         
-        return NVec3(int(x), int(y), int(z))
+        return NVec3(float(x), float(y), float(z))
 
     
     def get_xyz(self):
         return (self.x,self.y,self.z)
 
-    def get_x(self):
+    def get_x(self) -> float:
         return self.x
 
-    def get_y(self):
+    def get_y(self) -> float:
         return self.y
     
-    def get_z(self):
+    def get_z(self) -> float:
         return self.z
 
 

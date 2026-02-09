@@ -7,7 +7,7 @@ from typing import Tuple, Dict
 from soundedit.types import *
 from srctools import conv_bool
 
-
+from soundedit.utils import ConvertDataType
 
 class Manifest:
     """
@@ -50,7 +50,25 @@ class Manifest:
 
     def output_desc(self, type_: str) -> list[NodeOutputType]:
         return self.nodes[type_]['outputs']
+    
+    def get_port_type(self, nodetype:str, port_type: Literal['input', 'output'], port_name:str) -> str|None:
+        desc = None
+        match port_type:
+            case 'input':
+                desc = self.input_desc(nodetype)
+            
+            case 'output':
+                desc = self.output_desc(nodetype)
 
+            case _:
+                raise RuntimeError(f"Unsupported port type {port_type}")
+        
+        for el in desc:
+            if el['name'] == port_name:
+                return el['type']
+
+        return None
+        
     def keyvalue_desc(self, type_: str) -> list[NodeKeyValueType]:
         return self.nodes[type_]['keyvalues']
 
@@ -106,33 +124,7 @@ class Manifest:
         if val == None:
             raise RuntimeError(f"Cannot find default value for operator type {nodetype}: {key}")
         
-        match valtype:
-            case "bool":
-                return NBool(val)
-            
-            case "implcit_bool":
-                return NBool(val)
-
-            case "str":
-                return NStr(val)
-            
-            case "string":
-                return NStr(val)
-            
-            case "enum": # Enums are just fancy strings
-                return NEnumVal(val)
-            
-            case "float": # Floats also get mapped to str, because there is not Float input box (yet at least)
-                return NFloat(val)
-            
-            case "vec3":
-                return NVec3.from_str(val)
-            
-            case "speakers":
-                return NSpeakers(val)
-
-            case _:
-                raise RuntimeError(f"Unknown data type {valtype}!")
+        return ConvertDataType(val, valtype)
         
             
     
