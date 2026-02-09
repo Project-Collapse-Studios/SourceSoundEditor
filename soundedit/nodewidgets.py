@@ -7,7 +7,7 @@ from NodeGraphQt import NodeBaseWidget
 class NBoolWidget(QCheckBox):
     """Checkbox like widget"""
     def __init__(self, *arg):
-        super().__init__(arg, tristate=False)
+        super().__init__(*arg, tristate=False)
 
     def get_value(self):
         return NBool(self.isChecked())
@@ -16,15 +16,15 @@ class NBoolWidget(QCheckBox):
         self.setChecked(val.value)
 
 class NBoolWidgetWrapper(NodeBaseWidget):
-    def __init__(self, parent=None):
-        super(NBoolWidgetWrapper, self).__init__(parent)
+    def __init__(self, parent=None, name=None):
+        super(NBoolWidgetWrapper, self).__init__(parent, name)
         self.set_custom_widget(NBoolWidget())
 
     def get_value(self):
         return self.get_custom_widget().get_value()
 
     def set_value(self, value: NBool):
-        self.get_custom_widget().set_value(value.value)     
+        self.get_custom_widget().set_value(value)     
 
 class NIntWidget(QSpinBox):
     """Spinbox like widget"""
@@ -36,8 +36,8 @@ class NIntWidget(QSpinBox):
         self.setValue(val.value)
 
 class NIntWidgetWrapper(NodeBaseWidget):
-    def __init__(self, parent=None):
-        super(NIntWidgetWrapper, self).__init__(parent)
+    def __init__(self, parent=None, name=None):
+        super(NIntWidgetWrapper, self).__init__(parent, name)
        
         self.set_custom_widget(NIntWidget())
 
@@ -45,7 +45,7 @@ class NIntWidgetWrapper(NodeBaseWidget):
         return self.get_custom_widget().get_value()
 
     def set_value(self, value: NInt):
-        self.get_custom_widget().set_value(value.value)   
+        self.get_custom_widget().set_value(value)   
 
 class NFloatWidget(QDoubleSpinBox):
     """DoubleSpinbox like widget"""
@@ -57,8 +57,8 @@ class NFloatWidget(QDoubleSpinBox):
         self.setValue(val.value)
 
 class NFloatWidgetWrapper(NodeBaseWidget):
-    def __init__(self, parent=None):
-        super(NFloatWidgetWrapper, self).__init__(parent)
+    def __init__(self, parent=None, name=None):
+        super(NFloatWidgetWrapper, self).__init__(parent, name)
        
         self.set_custom_widget(NFloatWidget())
 
@@ -66,7 +66,7 @@ class NFloatWidgetWrapper(NodeBaseWidget):
         return self.get_custom_widget().get_value()
 
     def set_value(self, value: NFloat):
-        self.get_custom_widget().set_value(value.value)    
+        self.get_custom_widget().set_value(value)    
 
 class NLineStrWidget(QLineEdit):
     """DoubleSpinbox like widget"""
@@ -78,8 +78,8 @@ class NLineStrWidget(QLineEdit):
         self.setText(val.value)
 
 class NLineStrWidgetWrapper(NodeBaseWidget):
-    def __init__(self, parent=None):
-        super(NLineStrWidgetWrapper, self).__init__(parent)
+    def __init__(self, parent=None, name=None):
+        super(NLineStrWidgetWrapper, self).__init__(parent, name)
        
         self.set_custom_widget(NLineStrWidget())
 
@@ -87,7 +87,7 @@ class NLineStrWidgetWrapper(NodeBaseWidget):
         return self.get_custom_widget().get_value()
 
     def set_value(self, value: NStr):
-        self.get_custom_widget().set_value(value.value)    
+        self.get_custom_widget().set_value(value)    
 
 
 class NMultiLineStrWidget(QTextEdit):
@@ -100,8 +100,8 @@ class NMultiLineStrWidget(QTextEdit):
         self.setPlainText(val.value)
 
 class NMultiLineStrWidgetWrapper(NodeBaseWidget):
-    def __init__(self, parent=None):
-        super(NMultiLineStrWidgetWrapper, self).__init__(parent)
+    def __init__(self, parent=None, name=None):
+        super(NMultiLineStrWidgetWrapper, self).__init__(parent, name)
        
         self.set_custom_widget(NMultiLineStrWidget())
 
@@ -109,7 +109,7 @@ class NMultiLineStrWidgetWrapper(NodeBaseWidget):
         return self.get_custom_widget().get_value()
 
     def set_value(self, value: NStr):
-        self.get_custom_widget().set_value(value.value)   
+        self.get_custom_widget().set_value(value)   
 
 class NVec3Widget(QWidget):
     """DoubleSpinbox like widget"""
@@ -145,8 +145,8 @@ class NVec3Widget(QWidget):
         self.xBox.setValue(val.get_z().value)
 
 class NVec3WidgetWrapper(NodeBaseWidget):
-    def __init__(self, parent=None):
-        super(NVec3WidgetWrapper, self).__init__(parent)
+    def __init__(self, parent=None, name=None):
+        super(NVec3WidgetWrapper, self).__init__(parent, name)
        
         self.set_custom_widget(NVec3Widget())
 
@@ -154,4 +154,4 @@ class NVec3WidgetWrapper(NodeBaseWidget):
         return self.get_custom_widget().get_value()
 
     def set_value(self, value: NVec3):
-        self.get_custom_widget().set_value(value.get_xyz())   
+        self.get_custom_widget().set_value(value)   

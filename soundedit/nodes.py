@@ -16,6 +16,7 @@ from PySide6.QtGui import (
 from soundedit.manifest import MANIFEST
 from .types import NodeKeyValueType
 from srctools import conv_bool, Keyvalues
+from soundedit.nodewidgets import *
 
 class OperatorNode(BaseNode):
     """
@@ -76,32 +77,72 @@ class OperatorNode(BaseNode):
         """
         kvs = MANIFEST.keyvalue_desc(self.type)
         for kv in kvs:
+            widget = None
             match kv['type']:
-                case 'string':
-                    self.add_text_input(
-                        name=kv['name'],
-                        label=kv['name'],
-                        text=self._internalgetdefault(kv['name'])
-                    )
-                case 'implicit_bool':
-                    self.add_checkbox(
-                        name=kv['name'],
-                        label=kv['name'],
-                        state=self._internalgetdefault(kv['name'])
-                    )
-                case 'bool':
-                    self.add_checkbox(
-                        name=kv['name'],
-                        label=kv['name'],
-                        state=self._internalgetdefault(kv['name'])
-                    )
-                case 'enum':
+                case "string":
+                    widget = NLineStrWidgetWrapper(self.view, kv['name'])
+
+                case "implcit_bool":
+                    widget = NBoolWidgetWrapper(self.view, kv['name'])
+
+                case "bool":
+                    widget = NBoolWidgetWrapper(self.view, kv['name'])
+
+                case "float":
+                    widget = NFloatWidgetWrapper(self.view, kv['name'])
+
+                case "int":
+                    widget = NIntWidgetWrapper(self.view, kv['name'])
+
+                case "vec3":
+                    widget = NVec3WidgetWrapper(self.view, kv['name'])
+
+                case "speakers":
+                    pass
+
+                case "enum":
                     self.add_combo_menu(
                         name=kv['name'],
                         label=kv['name'],
                         items=kv['choices']
                     )
-                    self.set_property(kv['name'], self._internalgetdefault(kv['name']), push_undo=False)
+                    self.set_property(kv['name'], str(self._internalgetdefault(kv['name']).value), push_undo=False)
+
+                case _:
+                    pass
+                    #raise RuntimeError(f"Unknown data type {kv['type']}")
+
+            if widget:
+                self.add_custom_widget(widget)
+                    
+
+        #for kv in kvs:
+        #    match kv['type']:
+        #        case 'string':
+        #            self.add_text_input(
+        #                name=kv['name'],
+        #                label=kv['name'],
+        #                text=self._internalgetdefault(kv['name'])
+        #            )
+        #        case 'implicit_bool':
+        #            self.add_checkbox(
+        #                name=kv['name'],
+        #                label=kv['name'],
+        #                state=self._internalgetdefault(kv['name'])
+        #            )
+        #        case 'bool':
+        #            self.add_checkbox(
+        #                name=kv['name'],
+        #                label=kv['name'],
+        #                state=self._internalgetdefault(kv['name'])
+        #            )
+        #        case 'enum':
+        #            self.add_combo_menu(
+        #                name=kv['name'],
+        #                label=kv['name'],
+        #                items=kv['choices']
+        #            )
+        #            self.set_property(kv['name'], self._internalgetdefault(kv['name']), push_undo=False)
 
                 
     def set_widget_value(self, widget_name: str, value: str) -> bool:
@@ -128,8 +169,8 @@ class OperatorNode(BaseNode):
 
     def _internalgetdefault(self, key):
         """Internal function, gets the default of a keyvalue and saves it internally if we're an imported node, to compare with later"""
-        val, valtype = MANIFEST.get_default(self.type, key)
-        self.imported_data[key] = (val, valtype)
+        val = MANIFEST.get_default(self.type, key)
+        self.imported_data[key] = val
         return val
 
 
@@ -160,7 +201,7 @@ class OperatorNode(BaseNode):
                 name=name,
                 label=name,
                 tab=name,
-                text=self._internalgetdefault(name)
+                text=str(self._internalgetdefault(name).value) #TODO: Handle better
             )
             
 

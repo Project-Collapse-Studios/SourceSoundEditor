@@ -86,7 +86,7 @@ class Manifest:
                     return kv['type']
 
     
-    def get_default(self, nodetype: str, key: str) -> Tuple[str, str]:
+    def get_default(self, nodetype: str, key: str):
         """Get the default value of key from operator type of nodetype. Returns a tuple (value, value type)"""
         if key.startswith("input"): # Inputs are in a different part of the datastructure
             kv_desc = self.input_desc(nodetype)
@@ -126,13 +126,13 @@ class Manifest:
                 return NFloat(val)
             
             case "vec3":
-                return NVec3()
+                return NVec3.from_str(val)
             
             case "speakers":
                 return NSpeakers(val)
 
             case _:
-                raise RuntimeError(f"Unknown data type {to_return_valtype}!")
+                raise RuntimeError(f"Unknown data type {valtype}!")
         
             
     

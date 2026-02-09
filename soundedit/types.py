@@ -100,6 +100,18 @@ class NVec3:
         self.x = x
         self.y = y
         self.z = z
+
+        self.value = f"[{self.x} {self.y} {self.z}]"
+
+    @staticmethod
+    def from_str(s: str):
+        try:
+            x, y, z = s.split(" ")
+        except ValueError:
+            x, y, z = 0, 0, 0 #TODO: Implement undefined behaviour
+        
+        return NVec3(int(x), int(y), int(z))
+
     
     def get_xyz(self):
         return (self.x,self.y,self.z)
@@ -117,4 +129,4 @@ class NVec3:
 class NSpeakers:
     """Represents speakers"""
     def __init__(self, val):
-        pass
+        self.value = val
