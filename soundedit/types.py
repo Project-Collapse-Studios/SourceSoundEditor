@@ -69,25 +69,55 @@ class NBool:
     def __init__(self, val, def_ = False):
         self.value = conv_bool(val, default=def_)
 
+    def __eq__(self, val):
+        if not isinstance(val, NBool):
+            return False
+        
+        return val.value == self.value
+
 class NInt:
     """Represents an integer"""
     def __init__(self, val, def_ = 0):
         self.value = conv_int(val, default=def_)
+
+    def __eq__(self, val):
+        if not isinstance(val, NInt):
+            return False
+        
+        return val.value == self.value
 
 class NFloat:
     """Represents a float"""
     def __init__(self, val, def_ = 0):
         self.value = conv_float(val, default=def_)
 
+    def __eq__(self, val):
+        if not isinstance(val, NFloat):
+            return False
+        
+        return val.value == self.value
+
 class NStr:
     """Represents a string"""
     def __init__(self, val):
         self.value = val
 
+    def __eq__(self, val):
+        if not isinstance(val, NStr):
+            return False
+        
+        return val.value == self.value
+
 class NEnumVal:
     """Represents an enum value"""
     def __init__(self, val):
         self.value = val
+
+    def __eq__(self, val):
+        if not isinstance(val, NEnumVal):
+            return False
+        
+        return val.value == self.value
 
 class NVec3:
     """Represents a 3D Vector"""
@@ -98,6 +128,13 @@ class NVec3:
         self.z = z
 
         self.value = f"[{self.x} {self.y} {self.z}]"
+
+    def __eq__(self, val):
+        if not isinstance(val, NVec3):
+            return False
+        
+        return self.x == val.x and self.y == val.y and self.z == val.z
+        
 
     @staticmethod
     def from_str(s: str):
@@ -126,3 +163,9 @@ class NSpeakers:
     """Represents speakers"""
     def __init__(self, val):
         self.value = val
+
+    def __eq__(self, val):
+        if not isinstance(val, NSpeakers):
+            return False
+        
+        return val.value == self.value

@@ -26,7 +26,7 @@ class OperatorNode(BaseNode):
     for a bunch of generated types for the 'real' nodes
     """
 
-    NODE_NAME = 'new operator'
+    NODE_NAME = 'Operator'
     __identifier__ = 'io.soundedit.operators'
 
 
@@ -40,7 +40,7 @@ class OperatorNode(BaseNode):
         self.imported_data: dict = {} # Stores the data to compare with, if we can un-unregister ourselves
 
         self.inputs_save = {} # Saves data in input widgets for when they are disconnected
-
+        print(f"Setting node name {name}")
         self.set_property("name", name, push_undo=False)
         self._register_IO()
         self._create_kv_widgets()
@@ -144,6 +144,9 @@ class OperatorNode(BaseNode):
 
     def _internalgetdefault(self, key):
         """Internal function, gets the default of a keyvalue and saves it internally if we're an imported node, to compare with later"""
+        if self.initialized:
+            raise RuntimeError("Tried to use _internalgetdefault after initialization!")
+        
         val = MANIFEST.get_default(self.type, key)
         self.imported_data[key] = val
         return val
@@ -185,22 +188,24 @@ class OperatorNode(BaseNode):
 
     def set_property(self, name, value, push_undo = True):
         self.ImportTypeCheck()
+        if name == "name":
+            print("Setname called!")
         super().set_property(name, value, push_undo)
 
     def on_input_connected(self, in_port: Port, out_port: Port):
         """
         Called when an input is connected
         """
-        #if not MANIFEST.get_port_type(in_port.name()).casefold() == MANIFEST.get_port_type(out_port.name()).casefold():
-        #    self.
 
+        # Check if port type is correct
         in_type = MANIFEST.get_port_type(self.type, 'input', in_port.name()).casefold()
         out_type = MANIFEST.get_port_type(out_port.node().type, 'output', out_port.name()).casefold()
 
         if not ConversionExists(out_type, in_type): # If we can't convert from them to us
             in_port.disconnect_from(out_port, push_undo=False, emit_signal=False)
             return
-
+        
+        # Handle input widget
         w: QWidget = self.get_widget(in_port.name())
         
         if not w:
@@ -268,33 +273,39 @@ class OperatorNode(BaseNode):
         if not self.imported_data: # We have never been an imported node
             return False
         
-        return False #Temporarily disable this code
-        
-        widgets: dict = self.widgets()
+        widgets: dict['str', QWidget] = self.widgets()
         for wid_name in widgets.keys():
-            print(f"Checking  property {wid_name}")
-            #if wid_name.startswith("input"): #TODO: handle inputs
-            #    continue
+            if wid_name.startswith("input"): # Inputs checked at second pass
+                continue
 
-            if not wid_name in self.imported_data: # We have a custom property?
-                print(f"Custom property {wid_name}, skipping")
+            #print(f"Checking  property {wid_name}")
+
+            if not wid_name in self.imported_data.keys(): # We have a custom property?
+                #print(f"Custom property {wid_name}, skipping")
                 continue
             
-            # Try converting to bool, as a custom field
-            #TODO: REFACTOR THIS CODE
+            imported_wid_data = self.imported_data[wid_name]
+            if not self.get_property(wid_name) == imported_wid_data: # This automatically handles types because of N* Classes in types.py
+                return False
+        
+        for input_port_name in self.in_ports.keys():
+            input_port: Port = self.in_ports[input_port_name]
+            # We're checking an input port, check if the output port remained the same
+            connections = input_port.connected_ports()
+            if len(connections) > 1: # Only one connection is allowed in general
+                return False
+            
             try:
-                conversion1 = conv_bool(self.imported_data[wid_name], default="FAILED")
-                conversion2 = conv_bool(self.get_property(wid_name), default="FAILED")
-                if conversion1 == "FAILED" or conversion2 == "FAILED":
-                    raise RuntimeError # Will get properly handled
-                
-                if not conversion1 == conversion2: # Else we've converted properly, and this is a bool value
+                out_port: Port = self.imported_data[input_port_name]
+            except KeyError:
+                if len(connections) == 0: # If it errors, it means we didn't have a connection when imported, so check that we don't have one now
+                    continue
+                else:
                     return False
-            except:
-                if not self.imported_data[wid_name] == self.get_property(wid_name):
-                    #print(f"IData: {self.imported_data[wid_name]}")
-                    #print(f"PData: {self.get_property(wid_name)}")
-                    return False
+            
+            if not out_port in connections:
+                return False
+
 
         return True
             
@@ -309,17 +320,18 @@ class OperatorNode(BaseNode):
         
         if not self.imported:
             return
-        
-        return
 
+        self.initialized = False # Avoid recursion error
         self.set_property("color", (120, 120, 255, 255), False)
         if not self.name().startswith("IMPORTED"):
             self.set_property("name", "IMPORTED: " + self.name(), False)
 
-        if not self.imported_data: # Store default data
-            for wid_name in self.widgets():
-                print(f"Saving property {wid_name}: {self.get_property(wid_name)}")
-                self.imported_data[wid_name] = self.get_property(wid_name)
+        self.initialized = True
+
+        #if not self.imported_data: # Store default data
+        #    for wid_name in self.widgets():
+        #        print(f"Saving property {wid_name}: {self.get_property(wid_name)}")
+        #        self.imported_data[wid_name] = self.get_property(wid_name)
         
     def unregisterImportedType(self):
         """Called whenever anything in this node (besides output) changes. Unregisters the imported type and adds us to the operator stack."""

@@ -248,6 +248,7 @@ class SoundOperatorGraph(QObject):
                         print(f"Connecting ports {in_port} <-> {out_port}")
 
                         out_port.connect_to(in_port, push_undo=False)
+                        node_in.imported_data[kv.name] = out_port
 
     def _split_input_str(self, value: str) -> Tuple[str, str]: # (nodeName, outputName)
         value = value.removeprefix('@')
